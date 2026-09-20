@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ATENÇÃO: mantenha esta lista IDÊNTICA à lista EMAILS_AUTORIZADOS
+    // em src/lib/igreja.config.js e em firestore.rules.
+    function ehLider() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+        'natanaraujo.gg@gmail.com'
+        // adicione aqui os mesmos e-mails de src/lib/igreja.config.js
+      ];
+    }
+
+    // Só imagens e vídeos comuns; SVG fica de fora porque pode conter script.
+    function midiaPermitida() {
+      return (request.resource.contentType.matches('image/.*')
+              && !request.resource.contentType.matches('image/svg.*'))
+             || request.resource.contentType.matches('video/.*');
+    }
+    function imagemPermitida() {
+      return request.resource.contentType.matches('image/.*')
+             && !request.resource.contentType.matches('image/svg.*');
+    }
+
+    // Fotos e vídeos da galeria: qualquer visitante pode ver,
+    // só líderes autorizados podem enviar ou remover.
+    match /galeria/{arquivo=**} {
+      allow read: if true;
+      allow create, update: if ehLider() && midiaPermitida() && request.resource.size < 100 * 1024 * 1024;
+      allow delete: if ehLider();
+    }
+
+    // Imagens do bazar: mesma regra, mas só imagens.
+    match /bazar/{arquivo=**} {
+      allow read: if true;
+      allow create, update: if ehLider() && imagemPermitida() && request.resource.size < 20 * 1024 * 1024;
+      allow delete: if ehLider();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

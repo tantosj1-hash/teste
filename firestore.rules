@@ -1,0 +1,42 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ATENÇÃO: mantenha esta lista IDÊNTICA à lista EMAILS_AUTORIZADOS
+    // em src/lib/igreja.config.js. Esta é a proteção real: mesmo que
+    // alguém manipule o site no navegador, o Firestore só aceita
+    // escrita destes e-mails autenticados via Google.
+    function ehLider() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+        'natanaraujo.gg@gmail.com'
+        // adicione aqui os mesmos e-mails de src/lib/igreja.config.js
+      ];
+    }
+
+    // Cultos, eventos, galeria e bazar: leitura pública, escrita só de líderes autorizados
+    match /cultos/{docId} {
+      allow read: if true;
+      allow write: if ehLider();
+    }
+    match /eventos/{docId} {
+      allow read: if true;
+      allow write: if ehLider();
+    }
+    match /galeria/{docId} {
+      allow read: if true;
+      allow write: if ehLider();
+    }
+    match /bazar/{docId} {
+      allow read: if true;
+      allow write: if ehLider();
+    }
+
+    // Qualquer outra coleção fica bloqueada por padrão
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
